@@ -1,0 +1,30 @@
+module offsets where
+
+offset_layer : Integer
+offset_layer = 0
+
+offset_tree : Integer
+offset_tree = 1
+
+offset_type : Integer
+offset_type = 9
+
+offset_kp_addr2 : Integer
+offset_kp_addr2 = 12
+
+offset_kp_addr1 : Integer
+offset_kp_addr1 = 13
+
+offset_chain_addr : Integer
+offset_chain_addr = 17
+
+offset_hash_addr : Integer
+offset_hash_addr = 21
+
+offset_tree_h : Integer
+offset_tree_h = 17
+
+offset_tree_index : Integer
+offset_tree_index = 18
+
+
