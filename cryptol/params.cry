@@ -1,0 +1,55 @@
+module params where
+
+type n = 16
+
+type h = 66
+
+type d = 22
+
+type fors_h = 6
+
+type fors_trees = 33
+
+type wots_w = 16
+
+type wots_logw = 4
+
+type wots_len1 = (8*n)/wots_logw
+
+type wots_len2 = 3
+
+type wots_len = wots_len1+wots_len2
+
+type wots_bytes = wots_len*n
+
+type wots_pk_bytes = wots_bytes
+
+type tree_h = h/d
+
+type fors_msg_bytes = (fors_h*fors_trees+7)/8
+
+type fors_bytes = (fors_h+1)*fors_trees*n
+
+type fors_pk_bytes = n
+
+type sig_bytes = n+fors_bytes+d*wots_bytes+h*n
+
+type pk_bytes = 2*n
+
+type sk_bytes = 2*n+pk_bytes
+
+
+
+
+
+
+type Byte = [8]
+
+type NBytes = [n]Byte
+
+type addr_bytes = 32
+type addr = [addr_bytes]Byte
+
+type PK = [pk_bytes]Byte
+type SK = [sk_bytes]Byte
+type Signature = [sig_bytes]Byte
