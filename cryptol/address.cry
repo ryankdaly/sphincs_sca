@@ -1,0 +1,21 @@
+module address where
+
+import params
+import offsets
+
+
+wots_hash : Byte
+wots_hash = 0x00
+
+wots_pk : Byte
+wots_pk = 0x01
+
+hash_tree : Byte
+hash_tree = 0x02
+
+fors_tree : Byte
+fors_tree = 0x03
+
+fors_pk : Byte
+fors_pk = 0x04
+
