@@ -59,17 +59,19 @@ def treehash(root:bytearray,
             leaf_idx:int, 
             idx_offset:int, 
             tree_height:int,
-            gen_leaf: Callable[[bytes | bytearray, 
+            gen_leaf: Callable[[bytearray, 
+                                bytes | bytearray, 
                                 bytes | bytearray, 
                                 int, 
-                                bytearray], bytes | bytearray],
+                                bytearray], None],
             tree_addr:bytearray)->None:
     
     stack = bytearray((tree_height + 1)*SPX_N)
     heights = [0] * (tree_height + 1)
     offset = 0
     for idx in range(1 << tree_height):
-        leaf = gen_leaf(sk_seed, pub_seed, idx + idx_offset, tree_addr)
+        leaf = bytearray(SPX_N)
+        gen_leaf(leaf, sk_seed, pub_seed, idx + idx_offset, tree_addr)
         stack[offset*SPX_N:(offset+1)*SPX_N] = leaf[:SPX_N]
         offset += 1
         heights[offset-1] = 0
