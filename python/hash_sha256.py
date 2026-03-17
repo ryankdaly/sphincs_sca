@@ -64,10 +64,12 @@ def gen_message_random( R: bytearray,
     R[0:SPX_N] = buf[0:SPX_N]
 
 def hash_message(digest: bytearray,
+                 tree: list[int],
+                 leaf_idx: list[int],
                  R: bytes | bytearray,
                  pk: bytes | bytearray,
                  m: bytes | bytearray,
-                 mlen: int)->tuple[int, int]:
+                 mlen: int)->None:
     
     SPX_TREE_BITS = SPX_TREE_HEIGHT * (SPX_D - 1)
     SPX_TREE_BYTES = (SPX_TREE_BITS + 7) // 8
@@ -110,11 +112,12 @@ def hash_message(digest: bytearray,
     if SPX_TREE_BITS > 64:
         raise ValueError("For given height and depth, 64 bits cannot represent all subtrees")
     
-    tree = bytes_to_ull(buf[bufp:bufp + SPX_TREE_BYTES], SPX_TREE_BYTES)
-    tree &= (1 << SPX_TREE_BITS) - 1
+    treeval = bytes_to_ull(buf[bufp:bufp + SPX_TREE_BYTES], SPX_TREE_BYTES)
+    treeval &= (1 << SPX_TREE_BITS) - 1
     bufp += SPX_TREE_BYTES
 
-    leaf_idx = bytes_to_ull(buf[bufp:bufp + SPX_LEAF_BYTES], SPX_LEAF_BYTES)
-    leaf_idx &= (1 << SPX_LEAF_BITS) - 1
+    leaf_idx_val = bytes_to_ull(buf[bufp:bufp + SPX_LEAF_BYTES], SPX_LEAF_BYTES)
+    leaf_idx_val &= (1 << SPX_LEAF_BITS) - 1
 
-    return tree, leaf_idx
+    tree[0] = treeval
+    leaf_idx[0] = leaf_idx_val
