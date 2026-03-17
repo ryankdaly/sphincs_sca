@@ -5,7 +5,8 @@ from collections.abc import Callable
 from params import SPX_N
 from address import set_tree_height, set_tree_index
 
-#todo: bytes_to_ull
+def bytes_to_ull(inval: bytes | bytearray, inlen: int) -> int:
+    return inval.from_bytes(inlen, byteorder="big")
 
 def compute_root(root:bytearray, 
                 leaf:bytes|bytearray,
