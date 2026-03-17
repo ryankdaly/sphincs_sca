@@ -61,8 +61,9 @@ def treehash(root:bytearray,
             tree_height:int,
             gen_leaf: Callable[[bytes | bytearray, 
                                 bytes | bytearray, 
+                                bytes | bytearray, 
                                 int, 
-                                bytearray], bytes | bytearray],
+                                bytearray], None],
             tree_addr:bytearray)->None:
     
     stack = bytearray((tree_height + 1)*SPX_N)
