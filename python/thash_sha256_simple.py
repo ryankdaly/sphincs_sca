@@ -5,6 +5,7 @@ from sha256 import (
     SPX_SHA256_ADDR_BYTES, 
     SPX_SHA256_OUTPUT_BYTES, 
     state_seeded,
+    sha256_inc_finalize,
 )
 
 def thash(outval: bytearray, 
@@ -23,5 +24,5 @@ def thash(outval: bytearray,
     buf[0:SPX_SHA256_ADDR_BYTES] = addr[0:SPX_SHA256_ADDR_BYTES]
     buf[SPX_SHA256_ADDR_BYTES:SPX_SHA256_ADDR_BYTES + inblocks * SPX_N] = inval[0:inblocks * SPX_N]
 
-    #insert sha256_inc_finalize here
+    sha256_inc_finalize(outbuf, sha2_state, buf, SPX_SHA256_ADDR_BYTES + inblocks*SPX_N)
     outval[0:SPX_N] = outbuf[0:SPX_N]
