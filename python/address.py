@@ -16,11 +16,11 @@ from params import (
 )
 
 #helper utils
-def ull_to_bytes(outlen:int,inval:int)->bytes:
-    return inval.to_bytes(outlen, byteorder="big")
+def ull_to_bytes(outval: bytearray, outlen:int,inval:int)->None:
+    outval[0:outlen] = (inval&((1<<(8*outlen))-1)).to_bytes(outlen, byteorder="big")
 
-def u32_to_bytes(inval:int)->bytes:
-    return inval.to_bytes(4, byteorder="big")
+def u32_to_bytes(outval: bytearray, inval:int)->None:
+    outval[0:4] = (inval & 0xFFFFFFFF).to_bytes(4, byteorder="big")
 
 SPX_ADDR_TYPE_WOTS = 0
 SPX_ADDR_TYPE_WOTSPK = 1
