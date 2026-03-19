@@ -56,10 +56,9 @@ def gen_message_random( R: bytearray,
 
     if SPX_N + mlen < SPX_SHA256_BLOCK_BYTES:
         buf[SPX_N:SPX_N + mlen] = m[0:mlen]
-        sha256_inc_finalize(buf[SPX_SHA256_BLOCK_BYTES:SPX_SHA256_BLOCK_BYTES+SPX_SHA256_OUTPUT_BYTES], 
-                            state, 
-                            buf, 
-                            mlen + SPX_N)
+        outbuf = bytearray(SPX_SHA256_OUTPUT_BYTES)
+        sha256_inc_finalize(outbuf, state, buf, mlen + SPX_N)
+        buf[SPX_SHA256_BLOCK_BYTES:SPX_SHA256_BLOCK_BYTES+SPX_SHA256_OUTPUT_BYTES] = outbuf
     else:
         offset = SPX_SHA256_BLOCK_BYTES - SPX_N
         buf[SPX_N: SPX_SHA256_BLOCK_BYTES] = m[0:offset]
@@ -67,10 +66,9 @@ def gen_message_random( R: bytearray,
 
         m = m[offset:]
         mlen-=offset
-        sha256_inc_finalize(buf[SPX_SHA256_BLOCK_BYTES:SPX_SHA256_BLOCK_BYTES+SPX_SHA256_OUTPUT_BYTES], 
-                            state, 
-                            m, 
-                            mlen)
+        outbuf = bytearray(SPX_SHA256_OUTPUT_BYTES)
+        sha256_inc_finalize(outbuf, state,  m, mlen)
+        buf[SPX_SHA256_BLOCK_BYTES:SPX_SHA256_BLOCK_BYTES+SPX_SHA256_OUTPUT_BYTES] = outbuf
 
     for i in range(SPX_N):
         buf[i] = 0x5c ^ sk_prf[i]
