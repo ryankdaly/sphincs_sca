@@ -35,7 +35,7 @@ def compute_root(root:bytearray,
 
         set_tree_height(addr, i + 1)
         set_tree_index(addr, leaf_idx + idx_offset)
-        
+
         leafbuf = bytearray(SPX_N)
         if leaf_idx & 1:
             thash(leafbuf, buffer, 2, pub_seed, addr)

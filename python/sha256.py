@@ -159,7 +159,7 @@ def mgf1(out, outlen, input, inlen):
 
     while (i + 1) * SPX_SHA256_OUTPUT_BYTES <= outlen:
         inbuf = inbuf_prefix + _u32_to_bytes(i)
-        sha256(out[offset:offset + SPX_SHA256_OUTPUT_BYTES], inbuf, len(inbuf))
+        #sha256(out[offset:offset + SPX_SHA256_OUTPUT_BYTES], inbuf, len(inbuf))
 
         digest = hashlib.sha256(inbuf).digest()
         out[offset:offset + SPX_SHA256_OUTPUT_BYTES] = digest
