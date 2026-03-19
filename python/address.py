@@ -34,7 +34,9 @@ def set_layer_addr(addr:bytearray, layer:int) -> None:
 def set_tree_addr(addr:bytearray, tree:int) -> None:
     if (SPX_TREE_HEIGHT * (SPX_D - 1)) > 64:
         raise ValueError ("Subtree addressing is currently limited to at most 2^64 trees")
-    addr[SPX_OFFSET_TREE:SPX_OFFSET_TREE+8] = ull_to_bytes(8, tree)
+    buf = bytearray(8)
+    ull_to_bytes(buf, 8, tree)
+    addr[SPX_OFFSET_TREE:SPX_OFFSET_TREE+8] = buf
     
 def set_type(addr:bytearray, addrtype:int)->None:
     addr[SPX_OFFSET_TYPE] = addrtype&0xFF
@@ -63,4 +65,6 @@ def set_tree_height(addr:bytearray, tree_height:int)->None:
     addr[SPX_OFFSET_TREE_HGT] = tree_height&0xFF
 
 def set_tree_index(addr:bytearray, tree_index:int)->None:
-    addr[SPX_OFFSET_TREE_INDEX:SPX_OFFSET_TREE_INDEX+4] = u32_to_bytes(tree_index)
+    buf = bytearray(4)
+    u32_to_bytes(buf, tree_index)
+    addr[SPX_OFFSET_TREE_INDEX:SPX_OFFSET_TREE_INDEX+4] = buf
