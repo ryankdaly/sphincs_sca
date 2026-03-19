@@ -10,6 +10,7 @@ from params import (
     SPX_FORS_MSG_BYTES,
     SPX_BYTES,
     SPX_FORS_BYTES,
+    SPX_WOTS_LEN,
 )
 from address import (
     set_type,
@@ -25,6 +26,9 @@ from address import (
 from utils import treehash, compute_root
 from hash_sha256 import initialize_hash_function, gen_message_random, hash_message
 from fors import fors_sign, fors_pk_from_sig
+from thash_sha256_simple import thash
+from wots import wots_gen_pk, wots_sign, wots_pk_from_sig
+from rng import randombytes
 
 def wots_gen_leaf(leaf: bytearray,
                   sk_seed: bytes | bytearray,
@@ -40,10 +44,10 @@ def wots_gen_leaf(leaf: bytearray,
 
     copy_subtree_addr(wots_addr, tree_addr)
     set_keypair_addr(wots_addr, addr_idx)
-    #insert wots_gen_pk here
+    wots_gen_pk(pk, sk_seed, pub_seed, wots_addr)
 
     copy_keypair_addr(wots_pk_addr, wots_addr)
-    #insert thash here
+    thash(leaf, pk, SPX_WOTS_LEN, pub_seed, wots_pk_addr)
 
 def crypto_sign_secretkeybytes()-> int:
     return CRYPTO_SECRETKEYBYTES
@@ -87,7 +91,7 @@ def crypto_sign_seed_keypair(pk: bytearray, sk: bytearray, seed: bytes | bytearr
 
 def crypto_sign_keypair(pk: bytearray, sk: bytearray)->int:
     seed = bytearray(CRYPTO_SEEDBYTES)
-    #insert randombytes here
+    randombytes(seed, CRYPTO_SEEDBYTES)
     crypto_sign_seed_keypair(pk, sk, seed)
     return 0
 
@@ -115,7 +119,7 @@ def crypto_sign_signature(sig: bytearray,
     set_type(wots_addr, SPX_ADDR_TYPE_WOTS)
     set_type(tree_addr, SPX_ADDR_TYPE_HASHTREE)
 
-    #insert randombytes here
+    randombytes(optrand, SPX_N)
 
     r = bytearray(SPX_N)
     gen_message_random(r, sk_prf, optrand, m, mlen)
@@ -139,7 +143,7 @@ def crypto_sign_signature(sig: bytearray,
         copy_subtree_addr(wots_addr, tree_addr)
         set_keypair_addr(wots_addr, idx_leaf[0])
 
-        #insert wots_sign here
+        wots_sign(sig[sig_offset:sig_offset+SPX_WOTS_BYTES], root, sk_seed, pub_seed, wots_addr)
         sig_offset += SPX_WOTS_BYTES
 
         auth_path_i = bytearray(SPX_TREE_HEIGHT * SPX_N)
@@ -208,10 +212,10 @@ def crypto_sign_verify( sig: bytes|bytearray,
 
         copy_keypair_addr(wots_pk_addr, wots_addr)
 
-        #insert wots_pk_from_sig here
+        wots_pk_from_sig(wots_pk, sig[sig_offset:sig_offset+SPX_WOTS_BYTES], root, pub_seed, wots_addr)
         sig_offset += SPX_WOTS_BYTES
 
-        #insert thash here
+        thash(leaf, wots_pk, SPX_WOTS_LEN, pub_seed, wots_pk_addr)
 
         compute_root(root, 
                      leaf, 
