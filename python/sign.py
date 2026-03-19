@@ -143,7 +143,9 @@ def crypto_sign_signature(sig: bytearray,
         copy_subtree_addr(wots_addr, tree_addr)
         set_keypair_addr(wots_addr, idx_leaf[0])
 
-        wots_sign(sig[sig_offset:sig_offset+SPX_WOTS_BYTES], root, sk_seed, pub_seed, wots_addr)
+        wots_sig = bytearray(SPX_WOTS_BYTES)
+        wots_sign(wots_sig, root, sk_seed, pub_seed, wots_addr)
+        sig[sig_offset:sig_offset+SPX_WOTS_BYTES] = wots_sig
         sig_offset += SPX_WOTS_BYTES
 
         auth_path_i = bytearray(SPX_TREE_HEIGHT * SPX_N)
