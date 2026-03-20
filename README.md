@@ -12,4 +12,5 @@ wip
     - `--req PATH` Overrride the .req file path (test cases). By default this is `/python/test/PQCsignKAT_128.req`
     - `--rsp PATH` Override the .rsp file path (correct answers). By default this is `/python/test/PQCsignKAT_128.rsp`
     - `--limit n` Run n KATs from the input files instead of all KATs
+    - `--count` turn on count in terminal for each KAT generation and test
 ## Cryptol Instructions
