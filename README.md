@@ -5,7 +5,7 @@ wip
 - [github.com/sphincs/sphincsplus](https://github.com/sphincs/sphincsplus)
 ## Requirements
 ## Python Instructions
-1. Navigate to the `/sphincs_sca/python/` directory in terminal
+1. Download and navigate to the `/sphincs_sca/python/` directory in terminal
 2. Install dependencies: `pip install -r requirements.txt`
     - [pycryptodome](https://www.pycryptodome.org) for `rng.py`
 3. Run: `python main.py`
