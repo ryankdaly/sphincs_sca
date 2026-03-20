@@ -10,6 +10,6 @@ wip
     - [pycryptodome](https://www.pycryptodome.org) for `rng.py`
 3. Run: `python main.py`
     - `--req PATH` Overrride the .req file path (test cases). By default this is `/python/test/PQCsignKAT_128.req`
-    - `--rsp PATH` Override the .rsp file path (correct answers) By default this is `/python/test/PQCsignKAT_128.rsp`
+    - `--rsp PATH` Override the .rsp file path (correct answers). By default this is `/python/test/PQCsignKAT_128.rsp`
     - `--limit n` Run n KATs from the input files instead of all KATs
 ## Cryptol Instructions
