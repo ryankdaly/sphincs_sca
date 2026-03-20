@@ -63,13 +63,14 @@ def parse_kat_file(path: str | Path)->list[KAT]:
     
     return kats
     
-def run_kats(req_kats: list[KAT]) -> tuple[list[KAT], list[tuple[int, str]]]:
+def run_kats(req_kats: list[KAT], count: bool) -> tuple[list[KAT], list[tuple[int, str]]]:
     gen: list[KAT] = []
     fails: list[tuple[int, str]] = []
 
     for kat in req_kats:
         try:
-            print("KAT generation count ="+str(kat.count))
+            if count:
+                print("KAT generation count ="+str(kat.count))
             randombytes_init(bytearray(kat.seed), None, 256)
 
             pk = bytearray(CRYPTO_PUBLICKEYBYTES)
@@ -123,11 +124,12 @@ def format_rsp(kats: Iterable[KAT]) -> str:
         lines.append("")
     return "\n".join(lines)
 
-def compare_kats(gen: list[KAT], ref: list[KAT])->list[tuple[int, list[str]]]:
+def compare_kats(gen: list[KAT], ref: list[KAT], count: bool)->list[tuple[int, list[str]]]:
     fails: list[tuple[int, list[str]]] = []
 
     for i in range(min(len(ref), len(gen))):
-        print("KAT test count ="+str(i))
+        if count:
+            print("KAT test count ="+str(i))
         case_fail: list[str] = []
         if gen[i].count != ref[i].count:
             case_fail.append("count")
@@ -153,9 +155,10 @@ def compare_kats(gen: list[KAT], ref: list[KAT])->list[tuple[int, list[str]]]:
 
 def main()->int:
     argparser = argparse.ArgumentParser()
-    argparser.add_argument("--req", type=Path, default=None, help="Override req path")
-    argparser.add_argument("--rsp", type=Path, default=None, help="Override rsp path")
+    argparser.add_argument("--req", type=Path, default=None, help="override req path")
+    argparser.add_argument("--rsp", type=Path, default=None, help="override rsp path")
     argparser.add_argument("--limit", type=int, default=None, help="max KATs to test")
+    argparser.add_argument("--count", action="store_true", default=None, help="log count to terminal")
     args = argparser.parse_args()
     
     test_dir = Path(__file__).resolve().parent / "test"
@@ -182,7 +185,7 @@ def main()->int:
         req_kats = req_kats[:args.limit]
         rsp_kats = rsp_kats[:args.limit]
 
-    gen_kats, fail_kats = run_kats(req_kats)
+    gen_kats, fail_kats = run_kats(req_kats, args.count)
 
     print("Generation Done.")
 
@@ -202,7 +205,7 @@ def main()->int:
         return 1
     
     print("Testing "+str(rsp_gen_path)+" against " +str(rsp_path))
-    fail_kats = compare_kats(gen_kats, rsp_kats)
+    fail_kats = compare_kats(gen_kats, rsp_kats, args.count)
 
     if fail_kats:
         print("KAT Test Failures:")
