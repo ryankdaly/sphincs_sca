@@ -4,9 +4,10 @@ from collections.abc import Callable
 
 from params import SPX_N
 from address import set_tree_height, set_tree_index
+from thash_sha256_simple import thash
 
 def bytes_to_ull(inval: bytes | bytearray, inlen: int) -> int:
-    return inval.from_bytes(inlen, byteorder="big")
+    return int.from_bytes(inval[0:inlen], byteorder="big")
 
 def compute_root(root:bytearray, 
                 leaf:bytes|bytearray,
@@ -35,11 +36,14 @@ def compute_root(root:bytearray,
         set_tree_height(addr, i + 1)
         set_tree_index(addr, leaf_idx + idx_offset)
 
+        leafbuf = bytearray(SPX_N)
         if leaf_idx & 1:
-            #insert thash here
+            thash(leafbuf, buffer, 2, pub_seed, addr)
             buffer[0:SPX_N] = auth_path[auth_offset:auth_offset+SPX_N]
+            buffer[SPX_N:2*SPX_N] = leafbuf
         else:
-            #insert thash here
+            thash(leafbuf, buffer, 2, pub_seed, addr)
+            buffer[0:SPX_N] = leafbuf
             buffer[SPX_N:2 * SPX_N] = auth_path[auth_offset:auth_offset+SPX_N]
 
         auth_offset += SPX_N
@@ -48,7 +52,7 @@ def compute_root(root:bytearray,
     idx_offset >>= 1
     set_tree_height(addr, tree_height)
     set_tree_index(addr, leaf_idx + idx_offset)
-    #insert thash here
+    thash(root, buffer, 2, pub_seed, addr)
 
 
 
@@ -85,7 +89,13 @@ def treehash(root:bytearray,
             set_tree_height(tree_addr, heights[offset - 1] + 1)
             set_tree_index(tree_addr, tree_idx + (idx_offset >> (heights[offset-1] + 1)))
 
-            #insert thash here
+            leafbuf = bytearray(SPX_N)
+            thash(leafbuf, 
+                  stack[(offset - 2)*SPX_N:offset*SPX_N], 
+                  2, 
+                  pub_seed, 
+                  tree_addr)
+            stack[(offset - 2)*SPX_N:(offset - 1)*SPX_N] = leafbuf
             offset -= 1
             heights[offset - 1] += 1
 

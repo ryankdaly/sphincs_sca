@@ -8,10 +8,20 @@ from params import(
     SPX_PK_BYTES,
 )
 from utils import bytes_to_ull
-from sha256 import SPX_SHA256_BLOCK_BYTES, SPX_SHA256_OUTPUT_BYTES, SPX_SHA256_ADDR_BYTES
+from sha256 import (
+    SPX_SHA256_BLOCK_BYTES, 
+    SPX_SHA256_OUTPUT_BYTES, 
+    SPX_SHA256_ADDR_BYTES,
+    seed_state,
+    sha256,
+    sha256_inc_init,
+    sha256_inc_blocks,
+    sha256_inc_finalize,
+    mgf1,
+)
 
 def initialize_hash_function(pub_seed: bytes | bytearray, sk_seed: bytes | bytearray)->None:
-    #insert seed_state here
+    seed_state(pub_seed)
     _ = sk_seed
 
 def prf_addr(outval: bytearray, key: bytes | bytearray, addr: bytes | bytearray)->None:
@@ -21,7 +31,7 @@ def prf_addr(outval: bytearray, key: bytes | bytearray, addr: bytes | bytearray)
     buf[0:SPX_N] = key[0:SPX_N]
     buf[SPX_N:SPX_N+SPX_SHA256_ADDR_BYTES] = addr[0:SPX_SHA256_ADDR_BYTES]
 
-    #insert sha256 here
+    sha256(outbuf, buf, SPX_N + SPX_SHA256_ADDR_BYTES)
     outval[0:SPX_N] = outbuf[0:SPX_N]
 
 def gen_message_random( R: bytearray, 
@@ -39,28 +49,32 @@ def gen_message_random( R: bytearray,
         buf[i] = 0x36 ^ sk_prf[i]
     buf[SPX_N:SPX_SHA256_BLOCK_BYTES] = bytes([0x36])*(SPX_SHA256_BLOCK_BYTES - SPX_N)
 
-    #insert sha256_inc_init here
-    #insert sha256_inc_blocks here
+    sha256_inc_init(state)
+    sha256_inc_blocks(state, buf, 1)
 
     buf[0:SPX_N] = optrand[0:SPX_N]
 
     if SPX_N + mlen < SPX_SHA256_BLOCK_BYTES:
         buf[SPX_N:SPX_N + mlen] = m[0:mlen]
-        #insert sha256_inc_finalize here
+        outbuf = bytearray(SPX_SHA256_OUTPUT_BYTES)
+        sha256_inc_finalize(outbuf, state, buf, mlen + SPX_N)
+        buf[SPX_SHA256_BLOCK_BYTES:SPX_SHA256_BLOCK_BYTES+SPX_SHA256_OUTPUT_BYTES] = outbuf
     else:
         offset = SPX_SHA256_BLOCK_BYTES - SPX_N
         buf[SPX_N: SPX_SHA256_BLOCK_BYTES] = m[0:offset]
-        #insert sha256_inc_blocks here
+        sha256_inc_blocks(state, buf, 1)
 
         m = m[offset:]
         mlen-=offset
-        #insert sha256_inc_finalize here
+        outbuf = bytearray(SPX_SHA256_OUTPUT_BYTES)
+        sha256_inc_finalize(outbuf, state,  m, mlen)
+        buf[SPX_SHA256_BLOCK_BYTES:SPX_SHA256_BLOCK_BYTES+SPX_SHA256_OUTPUT_BYTES] = outbuf
 
     for i in range(SPX_N):
         buf[i] = 0x5c ^ sk_prf[i]
     buf[SPX_N: SPX_SHA256_BLOCK_BYTES] = bytes([0x5c])*(SPX_SHA256_BLOCK_BYTES - SPX_N)
 
-    #insert sha256 here
+    sha256(buf, buf, SPX_SHA256_BLOCK_BYTES + SPX_SHA256_OUTPUT_BYTES)
     R[0:SPX_N] = buf[0:SPX_N]
 
 def hash_message(digest: bytearray,
@@ -87,24 +101,24 @@ def hash_message(digest: bytearray,
     bufp = 0
     state = bytearray(40)
 
-    #insert  sha256_inc_init here
+    sha256_inc_init(state)
 
     inbuf[0:SPX_N] = R[0:SPX_N]
     inbuf[SPX_N:SPX_N + SPX_PK_BYTES] = pk[0:SPX_PK_BYTES]
 
     if SPX_N + SPX_PK_BYTES + mlen < SPX_INBLOCKS * SPX_SHA256_BLOCK_BYTES:
         inbuf[SPX_N + SPX_PK_BYTES: SPX_N + SPX_PK_BYTES + mlen]  = m[0:mlen]
-        #insert sha256_inc_finalize here
+        sha256_inc_finalize(seed, state, inbuf, SPX_N + SPX_PK_BYTES + mlen)
     else:
         val = SPX_INBLOCKS * SPX_SHA256_BLOCK_BYTES - SPX_N - SPX_PK_BYTES
         inbuf[SPX_N + SPX_PK_BYTES: SPX_N + SPX_PK_BYTES + val] = m[0:val]
-        #insert sha256_inc_blocks here
+        sha256_inc_blocks(state, inbuf, SPX_INBLOCKS)
 
         m = m[val:]
         mlen -= val
-        #insert sha256_inc_finalize here
+        sha256_inc_finalize(seed, state, m, mlen)
 
-    #insert mgf1 here
+    mgf1(buf, SPX_DGST_BYTES, seed, SPX_SHA256_OUTPUT_BYTES)
 
     digest[0:SPX_FORS_MSG_BYTES] = buf[bufp: bufp + SPX_FORS_MSG_BYTES]
     bufp += SPX_FORS_MSG_BYTES

@@ -145,7 +145,7 @@ def chain_lengths(lengths, msg):
         raise ValueError("chain_lengths: msg buffer too small")
 
     base_w(lengths, SPX_WOTS_LEN1, msg)
-    wots_checksum(lengths[SPX_WOTS_LEN1:], lengths)
+    #wots_checksum(lengths[SPX_WOTS_LEN1:], lengths)
 
     csum_part = [0] * SPX_WOTS_LEN2
     wots_checksum(csum_part, lengths[:SPX_WOTS_LEN1])

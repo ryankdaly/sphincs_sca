@@ -9,6 +9,7 @@ from address import (
     set_tree_height,
 )
 from hash_sha256 import prf_addr
+from thash_sha256_simple import thash
 
 def fors_gen_sk(sk: bytearray, sk_seed: bytes | bytearray, fors_leaf_addr: bytes | bytearray)->None:
     prf_addr(sk, sk_seed, fors_leaf_addr)
@@ -17,8 +18,7 @@ def fors_sk_to_leaf(leaf: bytearray,
                     sk: bytes|bytearray, 
                     pub_seed: bytes|bytearray, 
                     fors_leaf_addr: bytes|bytearray)->None:
-    #insert thash here
-    pass #placeholder
+    thash(leaf, sk, 1, pub_seed, fors_leaf_addr)
 
 def fors_gen_leaf( leaf: bytearray,
                     sk_seed: bytes|bytearray,
@@ -91,7 +91,7 @@ def fors_sign(sig: bytearray,
         sig[sig_offset: sig_offset + SPX_N * SPX_FORS_HEIGHT] = auth_path_i
         sig_offset += SPX_N * SPX_FORS_HEIGHT
 
-    #insert thash here
+    thash(pk, roots, SPX_FORS_TREES, pub_seed, fors_pk_addr)
 
 
 def fors_pk_from_sig(pk: bytearray,
@@ -137,4 +137,4 @@ def fors_pk_from_sig(pk: bytearray,
         roots[i*SPX_N:(i+1)*SPX_N] = root_i
         sig_offset += SPX_N * SPX_FORS_HEIGHT
 
-    #insert thash here
+    thash(pk, roots, SPX_FORS_TREES, pub_seed, fors_pk_addr)

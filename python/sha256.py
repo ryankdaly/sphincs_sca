@@ -56,7 +56,9 @@ def _sync_state_bytes_from_ctx(state):
     ctx = _get_state_ctx(state)
     digest_so_far = ctx["hasher"].copy().digest()
     state[:32] = digest_so_far
-    _store_bigendian_64(state[32:40], ctx["bytes_processed"])
+    buf = bytearray(8)
+    _store_bigendian_64(buf, ctx["bytes_processed"])
+    state[32:40] = buf
 
 
 def sha256_inc_init(state):
@@ -118,7 +120,9 @@ def sha256_inc_finalize(out, state, input, inlen):
     ctx["hasher"].update(bytes(input[:inlen]))
     ctx["bytes_processed"] += inlen
     state[:32] = digest
-    _store_bigendian_64(state[32:40], ctx["bytes_processed"])
+    buf = bytearray(8)
+    _store_bigendian_64(buf, ctx["bytes_processed"])
+    state[32:40] = buf
 
 
 def sha256(out, input, inlen):
@@ -155,7 +159,7 @@ def mgf1(out, outlen, input, inlen):
 
     while (i + 1) * SPX_SHA256_OUTPUT_BYTES <= outlen:
         inbuf = inbuf_prefix + _u32_to_bytes(i)
-        sha256(out[offset:offset + SPX_SHA256_OUTPUT_BYTES], inbuf, len(inbuf))
+        #sha256(out[offset:offset + SPX_SHA256_OUTPUT_BYTES], inbuf, len(inbuf))
 
         digest = hashlib.sha256(inbuf).digest()
         out[offset:offset + SPX_SHA256_OUTPUT_BYTES] = digest
