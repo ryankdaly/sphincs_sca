@@ -1,4 +1,3 @@
-// wots.c
 #include <string.h>
 #include "wots.h"
 #include "params.h"

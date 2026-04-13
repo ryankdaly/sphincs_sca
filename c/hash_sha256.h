@@ -1,4 +1,3 @@
-// hash_sha256.h
 #ifndef HASH_SHA256_H
 #define HASH_SHA256_H
 

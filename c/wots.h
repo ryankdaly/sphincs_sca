@@ -1,4 +1,3 @@
-// wots.h
 #ifndef WOTS_H
 #define WOTS_H
 

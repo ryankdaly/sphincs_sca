@@ -1,4 +1,3 @@
-// thash_sha256.h
 #ifndef THASH_SHA256_H
 #define THASH_SHA256_H
 

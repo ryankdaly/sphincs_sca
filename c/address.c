@@ -1,4 +1,3 @@
-// address.c
 #include "address.h"
 
 void ull_to_bytes(uint8_t *out, unsigned int outlen, uint64_t in) {

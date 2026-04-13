@@ -1,4 +1,3 @@
-// thash_sha256.c
 #include <string.h>
 #include "thash_sha256.h"
 #include "params.h"
