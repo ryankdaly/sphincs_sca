@@ -6,7 +6,7 @@
 #ifndef SPX_PARAMS_H
 #define SPX_PARAMS_H
 
-/* Core SPHINCS+ dimensions for sha256-256f-simple based on specifications */
+/* Core SPHINCS+ dimensions gathered from specification documentaion */
 #define SPX_N              32
 #define SPX_FULL_HEIGHT    68
 #define SPX_D              17
@@ -34,8 +34,8 @@
 #define SPX_WOTS_LEN1 (8 * SPX_N / SPX_WOTS_LOGW)
 
 /*
- * Precomputed checksum lengths for the supported Winternitz choices.
- * For this target variant we use W = 16, N = 32, which yields LEN2 = 3.
+ * Precomputed checksum lengths for WOTS
+ * W = 16, N = 32, which gives us LEN2 = 3.
  */
 #if SPX_WOTS_W == 256
     #if SPX_N <= 1
@@ -86,14 +86,9 @@
 #define SPX_PK_BYTES (2 * SPX_N)
 #define SPX_SK_BYTES (2 * SPX_N + SPX_PK_BYTES)
 
-/*
- * Optional per-signature randomization size.
- * This is still fixed even when signing deterministically at the API level.
- * Included in case we decide to use it.
- */
 #define SPX_OPTRAND_BYTES 32
 
-/* SHA-256-specific address field placement */
+/* SHA-256-specific address field placement header */
 #include "sha256_offsets.h"
 
-#endif /* SPX_PARAMS_H */
+#endif
