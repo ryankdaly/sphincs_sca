@@ -20,11 +20,7 @@ wip
 make clean
 make
 ```
-2. Run the basic C roundtrip test:
-```sh
-./test_sign
-```
-3. Run the full KAT harness against the official response file:
+2. Run the full KAT harness against the official response file:
 ```sh
 ./kat_test
 ```
