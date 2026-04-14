@@ -9,8 +9,25 @@ wip
 2. Install dependencies: `pip install -r requirements.txt`
     - [pycryptodome](https://www.pycryptodome.org) for `rng.py`
 3. Run: `python main.py`
-    - `--req PATH` Overrride the .req file path (test cases). By default this is `/python/test/PQCsignKAT_128.req`
+    - `--req PATH` Override the .req file path (test cases). By default this is `/python/test/PQCsignKAT_128.req`
     - `--rsp PATH` Override the .rsp file path (correct answers). By default this is `/python/test/PQCsignKAT_128.rsp`
     - `--limit n` Run n KATs from the input files instead of all KATs
     - `--count` turn on count in terminal for each KAT generation and test
-## Cryptol Instructions
+
+## C Instructions
+1. Build the C targets:
+```sh
+make clean
+make
+```
+2. Run the basic C roundtrip test:
+```sh
+./test_sign
+```
+3. Run the full KAT harness against the official response file:
+```sh
+./kat_test
+```
+
+
+
