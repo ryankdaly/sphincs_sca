@@ -5,25 +5,29 @@ wip
 - [github.com/sphincs/sphincsplus](https://github.com/sphincs/sphincsplus)
 ## Requirements
 ## Python Instructions
-1. Download and navigate to the `/sphincs_sca/python/` directory in terminal
+1. Navigate to the `python/` directory in terminal.
 2. Install dependencies: `pip install -r requirements.txt`
     - [pycryptodome](https://www.pycryptodome.org) for `rng.py`
 3. Run: `python main.py`
-    - `--req PATH` Override the .req file path (test cases). By default this is `/python/test/PQCsignKAT_128.req`
-    - `--rsp PATH` Override the .rsp file path (correct answers). By default this is `/python/test/PQCsignKAT_128.rsp`
+    - `--req PATH` Override the `.req` file path (test cases). By default this is `python/test/PQCsignKAT_128.req`
+    - `--rsp PATH` Override the `.rsp` file path (correct answers). By default this is `python/test/PQCsignKAT_128.rsp`
     - `--limit n` Run n KATs from the input files instead of all KATs
     - `--count` turn on count in terminal for each KAT generation and test
 
 ## C Instructions
-1. Build the C targets:
+1. Navigate to the `C/` directory in terminal.
+2. Build the C targets:
 ```sh
 make clean
 make
 ```
-2. Run the full KAT harness against the official response file:
+3. Run the full KAT harness against the official response file:
 ```sh
 ./kat_test
 ```
-
-
-
+This checks the implementation against the official KAT response entries in memory.
+4. Optional verbose mode:
+```sh
+./kat_test --verbose
+```
+This prints a per-case SHA-256 for the expected and generated KAT data.
