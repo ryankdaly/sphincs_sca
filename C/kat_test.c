@@ -203,6 +203,15 @@ static int compare_field(const char *name,
     return 0;
 }
 
+static int expect_success(const char *label, int rc, int count)
+{
+    if (rc != SPX_SUCCESS) {
+        fprintf(stderr, "count=%d %s failed with rc=%d\n", count, label, rc);
+        return -1;
+    }
+    return 0;
+}
+
 static int parse_args(int argc, char **argv, kat_options *opts)
 {
     int i;
@@ -283,32 +292,35 @@ int main(int argc, char **argv)
         memcpy(generated.msg, expected.msg, generated.mlen);
         randombytes_init(expected.seed, NULL, 256);
 
-        if (crypto_sign_keypair(generated.pk, generated.sk) != 0) {
-            fprintf(stderr, "count=%d keypair generation failed\n", expected.count);
+        if (expect_success("keypair generation",
+                           crypto_sign_keypair(generated.pk, generated.sk),
+                           expected.count) != 0) {
             free(opened);
             free_case(&generated);
             free_case(&expected);
             fclose(in_fp);
             return 1;
         }
-        if (crypto_sign(generated.sm,
-                        &generated.smlen,
-                        generated.msg,
-                        generated.mlen,
-                        generated.sk) != 0) {
-            fprintf(stderr, "count=%d signing failed\n", expected.count);
+        if (expect_success("signing",
+                           crypto_sign(generated.sm,
+                                       &generated.smlen,
+                                       generated.msg,
+                                       generated.mlen,
+                                       generated.sk),
+                           expected.count) != 0) {
             free(opened);
             free_case(&generated);
             free_case(&expected);
             fclose(in_fp);
             return 1;
         }
-        if (crypto_sign_open(opened,
-                             &opened_len,
-                             generated.sm,
-                             generated.smlen,
-                             generated.pk) != 0) {
-            fprintf(stderr, "count=%d open failed\n", expected.count);
+        if (expect_success("open",
+                           crypto_sign_open(opened,
+                                            &opened_len,
+                                            generated.sm,
+                                            generated.smlen,
+                                            generated.pk),
+                           expected.count) != 0) {
             free(opened);
             free_case(&generated);
             free_case(&expected);
