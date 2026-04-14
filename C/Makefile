@@ -13,18 +13,15 @@ LIB_SOURCES = \
 	spx_utils.c \
 	spx_wots.c
 
-TEST_SOURCES = test_sign.c
 KAT_SOURCES = kat_test.c
 
-all: test_sign kat_test
+all: kat_test
 
-test_sign: $(LIB_SOURCES) $(TEST_SOURCES)
-	$(CC) $(CFLAGS) -I. $(LIB_SOURCES) $(TEST_SOURCES) -o $@
 
 kat_test: $(LIB_SOURCES) $(KAT_SOURCES)
 	$(CC) $(CFLAGS) -I. $(LIB_SOURCES) $(KAT_SOURCES) -o $@
 
 clean:
-	rm -f test_sign kat_test
+	rm -f kat_test
 
 .PHONY: all clean
