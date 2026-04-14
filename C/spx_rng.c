@@ -14,6 +14,15 @@ typedef struct {
 
 static aes256_ctr_drbg_state drbg_state;
 
+/* Here I have a small AES-256 implementation so the C KAT path can build and run from
+ * just the repo sources and a normal C compiler. I figured that was the least
+ * annoying option for now compared to wiring in OpenSSL or another external
+ * crypto dependency.
+ *
+ * If we later move this code onto the microcontroller path, we should probably
+ * revisit this and decide whether this helper still belongs here or if the
+ * platform should provide the AES part.
+ */
 static const uint8_t sbox[256] = {
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b,
     0xfe, 0xd7, 0xab, 0x76, 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0,
