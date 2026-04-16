@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "sha256_core.h"
 #include "spx_rng.h"
 #include "spx_sign.h"
 
@@ -16,11 +15,18 @@ typedef struct {
     unsigned char sk[CRYPTO_SECRETKEYBYTES];
     size_t smlen;
     unsigned char *sm;
+    int has_pk;
+    int has_sk;
+    int has_smlen;
+    int has_sm;
 } kat_case;
 
 typedef struct {
-    int verbose;
+    const char *req_path;
     const char *rsp_path;
+    const char *out_path;
+    int limit;
+    int count_flag;
 } kat_options;
 
 static int parse_hex(const char *hex, unsigned char *out, size_t outlen)
@@ -68,7 +74,36 @@ static void free_case(kat_case *kat)
     kat->sm = NULL;
 }
 
-static int load_case_from_rsp(FILE *fp, kat_case *kat)
+static void free_cases(kat_case *cases, size_t count)
+{
+    size_t i;
+
+    if (cases == NULL) {
+        return;
+    }
+    for (i = 0; i < count; ++i) {
+        free_case(&cases[i]);
+    }
+    free(cases);
+}
+
+static int clone_case_fields(kat_case *dst, const kat_case *src)
+{
+    memset(dst, 0, sizeof(*dst));
+    dst->count = src->count;
+    memcpy(dst->seed, src->seed, sizeof(dst->seed));
+    dst->mlen = src->mlen;
+    dst->msg = (unsigned char *)malloc(dst->mlen == 0 ? 1 : dst->mlen);
+    if (dst->msg == NULL) {
+        return -1;
+    }
+    if (dst->mlen > 0) {
+        memcpy(dst->msg, src->msg, dst->mlen);
+    }
+    return 0;
+}
+
+static int load_case(FILE *fp, kat_case *kat)
 {
     char line[200000];
     int have_count = 0;
@@ -84,6 +119,7 @@ static int load_case_from_rsp(FILE *fp, kat_case *kat)
         if (*key == '\0' || *key == '#') {
             continue;
         }
+
         eq = strchr(key, '=');
         if (eq == NULL) {
             continue;
@@ -109,23 +145,29 @@ static int load_case_from_rsp(FILE *fp, kat_case *kat)
             if (parse_hex(val, kat->msg, kat->mlen) != 0) {
                 return -1;
             }
-        } else if (strcmp(key, "pk") == 0) {
+        } else if (strcmp(key, "pk") == 0 && *val != '\0') {
             if (parse_hex(val, kat->pk, sizeof(kat->pk)) != 0) {
                 return -1;
             }
-        } else if (strcmp(key, "sk") == 0) {
+            kat->has_pk = 1;
+        } else if (strcmp(key, "sk") == 0 && *val != '\0') {
             if (parse_hex(val, kat->sk, sizeof(kat->sk)) != 0) {
                 return -1;
             }
-        } else if (strcmp(key, "smlen") == 0) {
+            kat->has_sk = 1;
+        } else if (strcmp(key, "smlen") == 0 && *val != '\0') {
             kat->smlen = (size_t)strtoull(val, NULL, 10);
-            kat->sm = (unsigned char *)malloc(kat->smlen == 0 ? 1 : kat->smlen);
-            if (kat->sm == NULL) {
-                return -1;
-            }
+            kat->has_smlen = 1;
         } else if (strcmp(key, "sm") == 0) {
-            if (parse_hex(val, kat->sm, kat->smlen) != 0) {
-                return -1;
+            if (*val != '\0') {
+                kat->sm = (unsigned char *)malloc(kat->smlen == 0 ? 1 : kat->smlen);
+                if (kat->sm == NULL) {
+                    return -1;
+                }
+                if (parse_hex(val, kat->sm, kat->smlen) != 0) {
+                    return -1;
+                }
+                kat->has_sm = 1;
             }
             return have_count ? 1 : 0;
         }
@@ -134,99 +176,308 @@ static int load_case_from_rsp(FILE *fp, kat_case *kat)
     return 0;
 }
 
-static void hash_case_stable(unsigned char out[32], const kat_case *kat)
+static int load_cases(const char *path, kat_case **out_cases, size_t *out_count)
 {
-    unsigned char *buf;
-    size_t total_len = 4 + 48 + 8 + kat->mlen + CRYPTO_PUBLICKEYBYTES +
-                       CRYPTO_SECRETKEYBYTES + 8 + kat->smlen;
-    size_t off = 0;
+    FILE *fp;
+    kat_case *cases = NULL;
+    size_t count = 0;
+    size_t cap = 0;
+
+    *out_cases = NULL;
+    *out_count = 0;
+
+    fp = fopen(path, "r");
+    if (fp == NULL) {
+        return -1;
+    }
+
+    for (;;) {
+        kat_case tmp;
+        int rc = load_case(fp, &tmp);
+
+        if (rc < 0) {
+            fclose(fp);
+            free_cases(cases, count);
+            return -1;
+        }
+        if (rc == 0) {
+            break;
+        }
+
+        if (count == cap) {
+            size_t new_cap = cap == 0 ? 16 : 2 * cap;
+            kat_case *new_cases =
+                (kat_case *)realloc(cases, new_cap * sizeof(*new_cases));
+            if (new_cases == NULL) {
+                fclose(fp);
+                free_case(&tmp);
+                free_cases(cases, count);
+                return -1;
+            }
+            cases = new_cases;
+            cap = new_cap;
+        }
+
+        cases[count++] = tmp;
+    }
+
+    fclose(fp);
+    *out_cases = cases;
+    *out_count = count;
+    return 0;
+}
+
+static int write_hex_field(FILE *fp,
+                           const char *label,
+                           const unsigned char *buf,
+                           size_t len)
+{
     size_t i;
 
-    buf = (unsigned char *)malloc(total_len == 0 ? 1 : total_len);
-    if (buf == NULL) {
-        memset(out, 0, 32);
+    if (fprintf(fp, "%s = ", label) < 0) {
+        return -1;
+    }
+    for (i = 0; i < len; ++i) {
+        if (fprintf(fp, "%02X", buf[i]) < 0) {
+            return -1;
+        }
+    }
+    return fprintf(fp, "\n") < 0 ? -1 : 0;
+}
+
+static int write_case(FILE *fp, const kat_case *kat)
+{
+    if (fprintf(fp, "count = %d\n", kat->count) < 0) {
+        return -1;
+    }
+    if (write_hex_field(fp, "seed", kat->seed, sizeof(kat->seed)) != 0) {
+        return -1;
+    }
+    if (fprintf(fp, "mlen = %zu\n", kat->mlen) < 0) {
+        return -1;
+    }
+    if (write_hex_field(fp, "msg", kat->msg, kat->mlen) != 0) {
+        return -1;
+    }
+    if (write_hex_field(fp, "pk", kat->pk, sizeof(kat->pk)) != 0) {
+        return -1;
+    }
+    if (write_hex_field(fp, "sk", kat->sk, sizeof(kat->sk)) != 0) {
+        return -1;
+    }
+    if (fprintf(fp, "smlen = %zu\n", kat->smlen) < 0) {
+        return -1;
+    }
+    if (write_hex_field(fp, "sm", kat->sm, kat->smlen) != 0) {
+        return -1;
+    }
+    return fprintf(fp, "\n") < 0 ? -1 : 0;
+}
+
+static int write_rsp_file(const char *path, const kat_case *cases, size_t count)
+{
+    FILE *fp;
+    size_t i;
+
+    fp = fopen(path, "w");
+    if (fp == NULL) {
+        return -1;
+    }
+
+    for (i = 0; i < count; ++i) {
+        if (write_case(fp, &cases[i]) != 0) {
+            fclose(fp);
+            return -1;
+        }
+    }
+
+    fclose(fp);
+    return 0;
+}
+
+static int run_kats(const kat_case *req_cases,
+                    size_t req_count,
+                    int count_flag,
+                    kat_case **out_cases,
+                    size_t *out_count)
+{
+    kat_case *generated;
+    size_t i;
+
+    *out_cases = NULL;
+    *out_count = 0;
+
+    generated = (kat_case *)calloc(req_count == 0 ? 1 : req_count, sizeof(*generated));
+    if (generated == NULL) {
+        return -1;
+    }
+
+    for (i = 0; i < req_count; ++i) {
+        unsigned char *opened;
+        size_t opened_len = 0;
+
+        if (count_flag) {
+            printf("KAT generation count = %d\n", req_cases[i].count);
+        }
+
+        if (clone_case_fields(&generated[i], &req_cases[i]) != 0) {
+            free_cases(generated, i);
+            return -1;
+        }
+
+        opened = (unsigned char *)malloc(generated[i].mlen == 0 ? 1 : generated[i].mlen);
+        generated[i].sm =
+            (unsigned char *)malloc(generated[i].mlen + CRYPTO_BYTES);
+        if (opened == NULL || generated[i].sm == NULL) {
+            free(opened);
+            free_cases(generated, i + 1);
+            return -1;
+        }
+
+        randombytes_init(req_cases[i].seed, NULL, 256);
+
+        if (crypto_sign_keypair(generated[i].pk, generated[i].sk) != SPX_SUCCESS) {
+            fprintf(stderr, "crypto_sign_keypair failed at count=%d\n", req_cases[i].count);
+            free(opened);
+            free_cases(generated, i + 1);
+            return -1;
+        }
+
+        if (crypto_sign(generated[i].sm,
+                        &generated[i].smlen,
+                        generated[i].msg,
+                        generated[i].mlen,
+                        generated[i].sk) != SPX_SUCCESS) {
+            fprintf(stderr, "crypto_sign failed at count=%d\n", req_cases[i].count);
+            free(opened);
+            free_cases(generated, i + 1);
+            return -1;
+        }
+
+        if (crypto_sign_open(opened,
+                             &opened_len,
+                             generated[i].sm,
+                             generated[i].smlen,
+                             generated[i].pk) != SPX_SUCCESS) {
+            fprintf(stderr, "crypto_sign_open failed at count=%d\n", req_cases[i].count);
+            free(opened);
+            free_cases(generated, i + 1);
+            return -1;
+        }
+
+        if (opened_len != generated[i].mlen ||
+            (opened_len > 0 && memcmp(opened, generated[i].msg, opened_len) != 0)) {
+            fprintf(stderr, "crypto_sign_open returned bad message at count=%d\n",
+                    req_cases[i].count);
+            free(opened);
+            free_cases(generated, i + 1);
+            return -1;
+        }
+
+        generated[i].has_pk = 1;
+        generated[i].has_sk = 1;
+        generated[i].has_smlen = 1;
+        generated[i].has_sm = 1;
+
+        free(opened);
+    }
+
+    *out_cases = generated;
+    *out_count = req_count;
+    return 0;
+}
+
+static int compare_cases(const kat_case *generated,
+                         const kat_case *reference,
+                         size_t count,
+                         int count_flag)
+{
+    size_t i;
+
+    for (i = 0; i < count; ++i) {
+        if (count_flag) {
+            printf("KAT test count = %d\n", reference[i].count);
+        }
+
+        if (generated[i].count != reference[i].count) {
+            fprintf(stderr, "count=%d mismatch in count\n", reference[i].count);
+            return -1;
+        }
+        if (memcmp(generated[i].seed, reference[i].seed, sizeof(generated[i].seed)) != 0) {
+            fprintf(stderr, "count=%d mismatch in seed\n", reference[i].count);
+            return -1;
+        }
+        if (generated[i].mlen != reference[i].mlen) {
+            fprintf(stderr, "count=%d mismatch in mlen\n", reference[i].count);
+            return -1;
+        }
+        if ((generated[i].mlen > 0 &&
+             memcmp(generated[i].msg, reference[i].msg, generated[i].mlen) != 0)) {
+            fprintf(stderr, "count=%d mismatch in msg\n", reference[i].count);
+            return -1;
+        }
+        if (memcmp(generated[i].pk, reference[i].pk, sizeof(generated[i].pk)) != 0) {
+            fprintf(stderr, "count=%d mismatch in pk\n", reference[i].count);
+            return -1;
+        }
+        if (memcmp(generated[i].sk, reference[i].sk, sizeof(generated[i].sk)) != 0) {
+            fprintf(stderr, "count=%d mismatch in sk\n", reference[i].count);
+            return -1;
+        }
+        if (generated[i].smlen != reference[i].smlen) {
+            fprintf(stderr, "count=%d mismatch in smlen\n", reference[i].count);
+            return -1;
+        }
+        if ((generated[i].smlen > 0 &&
+             memcmp(generated[i].sm, reference[i].sm, generated[i].smlen) != 0)) {
+            fprintf(stderr, "count=%d mismatch in sm\n", reference[i].count);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static void limit_cases(kat_case *cases, size_t *count, int limit)
+{
+    size_t i;
+
+    if (limit < 0 || (size_t)limit >= *count) {
         return;
     }
 
-    for (i = 0; i < 4; ++i) {
-        buf[off + 3 - i] =
-            (unsigned char)(((unsigned int)kat->count >> (8 * i)) & 0xffu);
+    for (i = (size_t)limit; i < *count; ++i) {
+        free_case(&cases[i]);
     }
-    off += 4;
-    memcpy(buf + off, kat->seed, 48);
-    off += 48;
-    for (i = 0; i < 8; ++i) {
-        buf[off + 7 - i] =
-            (unsigned char)(((unsigned long long)kat->mlen >> (8 * i)) & 0xffu);
-    }
-    off += 8;
-    memcpy(buf + off, kat->msg, kat->mlen);
-    off += kat->mlen;
-    memcpy(buf + off, kat->pk, CRYPTO_PUBLICKEYBYTES);
-    off += CRYPTO_PUBLICKEYBYTES;
-    memcpy(buf + off, kat->sk, CRYPTO_SECRETKEYBYTES);
-    off += CRYPTO_SECRETKEYBYTES;
-    for (i = 0; i < 8; ++i) {
-        buf[off + 7 - i] =
-            (unsigned char)(((unsigned long long)kat->smlen >> (8 * i)) & 0xffu);
-    }
-    off += 8;
-    memcpy(buf + off, kat->sm, kat->smlen);
-    off += kat->smlen;
-
-    sha256(out, buf, off);
-    free(buf);
-}
-
-static void bytes_to_hex(const unsigned char *in, size_t inlen, char *out)
-{
-    static const char hex[] = "0123456789abcdef";
-    size_t i;
-
-    for (i = 0; i < inlen; ++i) {
-        out[2 * i] = hex[in[i] >> 4];
-        out[2 * i + 1] = hex[in[i] & 0x0f];
-    }
-    out[2 * inlen] = '\0';
-}
-
-static int compare_field(const char *name,
-                         const unsigned char *got,
-                         const unsigned char *want,
-                         size_t len,
-                         int count)
-{
-    if (memcmp(got, want, len) != 0) {
-        fprintf(stderr, "count=%d mismatch in %s\n", count, name);
-        return -1;
-    }
-    return 0;
-}
-
-static int expect_success(const char *label, int rc, int count)
-{
-    if (rc != SPX_SUCCESS) {
-        fprintf(stderr, "count=%d %s failed with rc=%d\n", count, label, rc);
-        return -1;
-    }
-    return 0;
+    *count = (size_t)limit;
 }
 
 static int parse_args(int argc, char **argv, kat_options *opts)
 {
     int i;
 
-    opts->verbose = 0;
-    opts->rsp_path = "../python/test/PQCsignKAT_128.rsp";
+    opts->req_path = "../C/test/PQCsignKAT_128.req";
+    opts->rsp_path = "../C/test/PQCsignKAT_128.rsp";
+    opts->out_path = "../C/test/PQCsignKAT_128_gen_c.rsp";
+    opts->limit = -1;
+    opts->count_flag = 0;
 
     for (i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--verbose") == 0) {
-            opts->verbose = 1;
-        } else if (argv[i][0] == '-') {
-            fprintf(stderr, "usage: %s [--verbose]\n", argv[0]);
-            return -1;
+        if (strcmp(argv[i], "--req") == 0 && i + 1 < argc) {
+            opts->req_path = argv[++i];
+        } else if (strcmp(argv[i], "--rsp") == 0 && i + 1 < argc) {
+            opts->rsp_path = argv[++i];
+        } else if (strcmp(argv[i], "--out") == 0 && i + 1 < argc) {
+            opts->out_path = argv[++i];
+        } else if (strcmp(argv[i], "--limit") == 0 && i + 1 < argc) {
+            opts->limit = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--count") == 0) {
+            opts->count_flag = 1;
         } else {
-            opts->rsp_path = argv[i];
+            fprintf(stderr,
+                    "usage: %s [--req path] [--rsp path] [--out path] [--limit n] [--count]\n",
+                    argv[0]);
+            return -1;
         }
     }
 
@@ -236,169 +487,73 @@ static int parse_args(int argc, char **argv, kat_options *opts)
 int main(int argc, char **argv)
 {
     kat_options opts;
-    FILE *in_fp;
-    int case_count = 0;
+    kat_case *req_cases = NULL;
+    kat_case *rsp_cases = NULL;
+    kat_case *gen_cases = NULL;
+    size_t req_count = 0;
+    size_t rsp_count = 0;
+    size_t gen_count = 0;
 
     if (parse_args(argc, argv, &opts) != 0) {
         return 1;
     }
 
-    in_fp = fopen(opts.rsp_path, "r");
-    if (in_fp == NULL) {
-        fprintf(stderr, "failed to open %s\n", opts.rsp_path);
+    if (load_cases(opts.req_path, &req_cases, &req_count) != 0) {
+        fprintf(stderr, "Missing or unreadable .req file: %s\n", opts.req_path);
+        return 1;
+    }
+    if (load_cases(opts.rsp_path, &rsp_cases, &rsp_count) != 0) {
+        fprintf(stderr, "Missing or unreadable .rsp file: %s\n", opts.rsp_path);
+        free_cases(req_cases, req_count);
         return 1;
     }
 
-    for (;;) {
-        kat_case expected;
-        kat_case generated;
-        unsigned char *opened;
-        size_t opened_len = 0;
-        int loaded = load_case_from_rsp(in_fp, &expected);
-        unsigned char expected_hash[32];
-        unsigned char generated_hash[32];
-        char expected_hex[65];
-        char generated_hex[65];
+    limit_cases(req_cases, &req_count, opts.limit);
+    limit_cases(rsp_cases, &rsp_count, opts.limit);
 
-        if (loaded < 0) {
-            fprintf(stderr, "failed to parse %s\n", opts.rsp_path);
-            fclose(in_fp);
-            return 1;
-        }
-        if (loaded == 0) {
-            break;
-        }
-
-        memset(&generated, 0, sizeof(generated));
-        generated.count = expected.count;
-        memcpy(generated.seed, expected.seed, sizeof(generated.seed));
-        generated.mlen = expected.mlen;
-        generated.msg =
-            (unsigned char *)malloc(generated.mlen == 0 ? 1 : generated.mlen);
-        generated.sm =
-            (unsigned char *)malloc(expected.smlen == 0 ? 1 : expected.smlen);
-        opened = (unsigned char *)malloc(expected.mlen == 0 ? 1 : expected.mlen);
-
-        if (generated.msg == NULL || generated.sm == NULL || opened == NULL) {
-            fprintf(stderr, "allocation failed\n");
-            free(generated.msg);
-            free(generated.sm);
-            free(opened);
-            free_case(&expected);
-            fclose(in_fp);
-            return 1;
-        }
-
-        memcpy(generated.msg, expected.msg, generated.mlen);
-        randombytes_init(expected.seed, NULL, 256);
-
-        if (expect_success("keypair generation",
-                           crypto_sign_keypair(generated.pk, generated.sk),
-                           expected.count) != 0) {
-            free(opened);
-            free_case(&generated);
-            free_case(&expected);
-            fclose(in_fp);
-            return 1;
-        }
-        if (expect_success("signing",
-                           crypto_sign(generated.sm,
-                                       &generated.smlen,
-                                       generated.msg,
-                                       generated.mlen,
-                                       generated.sk),
-                           expected.count) != 0) {
-            free(opened);
-            free_case(&generated);
-            free_case(&expected);
-            fclose(in_fp);
-            return 1;
-        }
-        if (expect_success("open",
-                           crypto_sign_open(opened,
-                                            &opened_len,
-                                            generated.sm,
-                                            generated.smlen,
-                                            generated.pk),
-                           expected.count) != 0) {
-            free(opened);
-            free_case(&generated);
-            free_case(&expected);
-            fclose(in_fp);
-            return 1;
-        }
-
-        hash_case_stable(expected_hash, &expected);
-        hash_case_stable(generated_hash, &generated);
-        bytes_to_hex(expected_hash, sizeof(expected_hash), expected_hex);
-        bytes_to_hex(generated_hash, sizeof(generated_hash), generated_hex);
-
-        if (opts.verbose) {
-            printf("count=%d expected_sha256=%s generated_sha256=%s\n",
-                   expected.count,
-                   expected_hex,
-                   generated_hex);
-        }
-
-        if (compare_field("pk",
-                          generated.pk,
-                          expected.pk,
-                          sizeof(generated.pk),
-                          expected.count) != 0 ||
-            compare_field("sk",
-                          generated.sk,
-                          expected.sk,
-                          sizeof(generated.sk),
-                          expected.count) != 0 ||
-            generated.smlen != expected.smlen ||
-            compare_field("sm",
-                          generated.sm,
-                          expected.sm,
-                          generated.smlen,
-                          expected.count) != 0 ||
-            opened_len != expected.mlen ||
-            compare_field("msg",
-                          opened,
-                          expected.msg,
-                          expected.mlen,
-                          expected.count) != 0 ||
-            memcmp(expected_hash, generated_hash, sizeof(expected_hash)) != 0) {
-            if (generated.smlen != expected.smlen) {
-                fprintf(stderr,
-                        "count=%d mismatch in smlen: got=%zu want=%zu\n",
-                        expected.count,
-                        generated.smlen,
-                        expected.smlen);
-            }
-            if (opened_len != expected.mlen) {
-                fprintf(stderr,
-                        "count=%d mismatch in opened length: got=%zu want=%zu\n",
-                        expected.count,
-                        opened_len,
-                        expected.mlen);
-            }
-            if (memcmp(expected_hash, generated_hash, sizeof(expected_hash)) != 0) {
-                fprintf(stderr,
-                        "count=%d case hash mismatch: expected=%s generated=%s\n",
-                        expected.count,
-                        expected_hex,
-                        generated_hex);
-            }
-            free(opened);
-            free_case(&generated);
-            free_case(&expected);
-            fclose(in_fp);
-            return 1;
-        }
-
-        ++case_count;
-        free(opened);
-        free_case(&generated);
-        free_case(&expected);
+    if (run_kats(req_cases,
+                 req_count,
+                 opts.count_flag,
+                 &gen_cases,
+                 &gen_count) != 0) {
+        free_cases(req_cases, req_count);
+        free_cases(rsp_cases, rsp_count);
+        free_cases(gen_cases, gen_count);
+        return 1;
     }
 
-    fclose(in_fp);
+    printf("Generation Done.\n");
 
-    printf("All %d KATs passed.\n", case_count);
+    if (write_rsp_file(opts.out_path, gen_cases, gen_count) != 0) {
+        fprintf(stderr, "Failed to write generated rsp file: %s\n", opts.out_path);
+        free_cases(req_cases, req_count);
+        free_cases(rsp_cases, rsp_count);
+        free_cases(gen_cases, gen_count);
+        return 1;
+    }
+
+    printf("Wrote to file %s\n", opts.out_path);
+
+    if (gen_count != rsp_count) {
+        fprintf(stderr, "KAT count mismatch: gen=%zu, ref=%zu\n", gen_count, rsp_count);
+        free_cases(req_cases, req_count);
+        free_cases(rsp_cases, rsp_count);
+        free_cases(gen_cases, gen_count);
+        return 1;
+    }
+
+    printf("Testing %s against %s\n", opts.out_path, opts.rsp_path);
+    if (compare_cases(gen_cases, rsp_cases, gen_count, opts.count_flag) != 0) {
+        free_cases(req_cases, req_count);
+        free_cases(rsp_cases, rsp_count);
+        free_cases(gen_cases, gen_count);
+        return 1;
+    }
+
+    printf("All %zu KATs passed. File:%s\n", gen_count, opts.out_path);
+
+    free_cases(req_cases, req_count);
+    free_cases(rsp_cases, rsp_count);
+    free_cases(gen_cases, gen_count);
     return 0;
 }
