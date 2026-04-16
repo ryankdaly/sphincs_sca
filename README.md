@@ -21,13 +21,20 @@ wip
 make clean
 make
 ```
-3. Run the full KAT harness against the official response file:
+3. Run the full KAT harness:
 ```sh
 ./kat_test
 ```
-This checks the implementation against the official KAT response entries in memory.
-4. Optional verbose mode:
+By default this:
+- reads `../python/test/PQCsignKAT_128.req`
+- generates a fresh `../python/test/PQCsignKAT_128_gen_c.rsp`
+- compares the generated output against `../python/test/PQCsignKAT_128.rsp`
+4. Optional C KAT arguments:
 ```sh
-./kat_test --verbose
+./kat_test --req ../python/test/PQCsignKAT_128.req
+./kat_test --rsp ../python/test/PQCsignKAT_128.rsp
+./kat_test --out ../python/test/PQCsignKAT_128_gen_c.rsp
+./kat_test --limit 5
+./kat_test --count
 ```
-This prints a per-case SHA-256 for the expected and generated KAT data.
+`--count` logs each KAT as it is generated and tested.
